@@ -116,7 +116,7 @@ Room scores are stored as a JSON array on the listing row:
 
 ## Data Model
 
-### Database: Raw SQLite (no ORM)
+### Database: SQLAlchemy
 
 No automatic cleanup — all data is retained indefinitely. Old feedback remains useful for the LLM prompt.
 
@@ -276,6 +276,9 @@ If no bedrooms or living room can be identified in the photos, say so.
 ```
 FIRECRAWL_API_KEY=...
 ANTHROPIC_API_KEY=...
+OPENROUTER_API_KEY=...   # optional; set when LLM_PROVIDER=openrouter
+OPENROUTER_MODEL=...     # optional; e.g. anthropic/claude-sonnet-4, openai/gpt-4o (default: Claude Sonnet)
+LLM_PROVIDER=...         # optional; one of openai, anthropic, openrouter (default: anthropic)
 SENDGRID_API_KEY=...
 SENDGRID_FROM_EMAIL=...
 DATABASE_PATH=./house_finder.db
@@ -310,7 +313,7 @@ house_finder/
 ## Dependencies
 
 - `firecrawl-py` — Firecrawl search + crawl API
-- `anthropic` — Claude API for photo analysis
+- `anthropic` — Claude API for photo analysis (or use `openai` / `openrouter` via `LLM_PROVIDER`)
 - `sendgrid` — Email delivery
 - `fastapi` — Feedback endpoint server
 - `uvicorn` — ASGI server for FastAPI
@@ -320,7 +323,7 @@ house_finder/
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| LLM provider | Claude (Anthropic) | Already in ecosystem, strong vision |
+| LLM provider | OpenAI, Anthropic, or OpenRouter | Configurable via `LLM_PROVIDER`; OpenRouter allows many models with one API key |
 | Photo analysis passes | Single pass | Two passes is excessive; one call handles room ID + scoring |
 | Photo cap per listing | None (send all) | Prioritize accuracy over cost |
 | LLM description text | Photos only | Descriptions can be misleading marketing copy |
