@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>House Finder Review</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #333; }
+
+  .header {
+    position: sticky; top: 0; z-index: 100;
+    background: #fff; border-bottom: 1px solid #ddd; padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .header h1 { font-size: 1.2em; font-weight: 600; }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .progress { font-size: 0.9em; color: #666; }
+  .progress-bar { width: 120px; height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; background: #4CAF50; transition: width 0.3s; }
+  .btn-finish {
+    background: #1a73e8; color: #fff; border: none; padding: 8px 20px;
+    border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 500;
+  }
+  .btn-finish:hover { background: #1557b0; }
+
+  .stats {
+    max-width: 900px; margin: 20px auto 0; padding: 0 20px;
+    font-size: 0.85em; color: #888;
+  }
+
+  .listings { max-width: 900px; margin: 12px auto; padding: 0 20px 40px; }
+
+  .card {
+    background: #fff; border: 1px solid #e0e0e0; border-radius: 10px;
+    margin-bottom: 20px; overflow: hidden; transition: opacity 0.3s;
+  }
+  .card.reviewed { opacity: 0.65; }
+  .card.reviewed .card-body { position: relative; }
+  .card.reviewed .card-body::after {
+    content: attr(data-vote-label);
+    position: absolute; top: 12px; right: 12px;
+    padding: 4px 12px; border-radius: 20px; font-size: 0.8em; font-weight: 600;
+  }
+  .card.voted-yes .card-body::after { background: #e8f5e9; color: #2e7d32; }
+  .card.voted-no .card-body::after { background: #fbe9e7; color: #c62828; }
+
+  .card-body { padding: 20px; }
+  .card-title { font-size: 1.15em; font-weight: 600; margin-bottom: 4px; }
+  .card-meta { color: #666; font-size: 0.9em; margin-bottom: 12px; }
+  .card-meta .score { font-weight: 600; }
+  .card-meta .pass { color: #2e7d32; }
+  .card-meta .fail { color: #c62828; }
+
+  .photos {
+    display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 12px;
+    scrollbar-width: thin;
+  }
+  .photos img {
+    height: 200px; width: auto; border-radius: 6px; flex-shrink: 0;
+    object-fit: cover; cursor: pointer;
+  }
+  .photos img:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+
+  .room-cards { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
+  .room-card {
+    display: flex; gap: 14px; padding: 10px; background: #fafafa;
+    border: 1px solid #eee; border-radius: 8px; align-items: center;
+  }
+  .room-card img {
+    height: 140px; width: 180px; object-fit: cover; border-radius: 6px;
+    flex-shrink: 0; cursor: pointer;
+  }
+  .room-card img:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  .room-card .no-photo {
+    height: 140px; width: 180px; background: #e8e8e8; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    color: #999; font-size: 0.8em; flex-shrink: 0;
+  }
+  .room-info { flex: 1; font-size: 0.9em; }
+  .room-info .room-name { font-weight: 600; text-transform: capitalize; }
+  .room-info .score-val { font-weight: 600; margin-left: 8px; }
+  .room-info .pass-icon { color: #2e7d32; }
+  .room-info .fail-icon { color: #c62828; }
+  .room-info .room-reasoning { color: #666; margin-top: 4px; font-size: 0.92em; }
+
+  .reasoning { font-size: 0.88em; color: #555; margin: 8px 0; font-style: italic; }
+  .listing-link { font-size: 0.82em; color: #1a73e8; word-break: break-all; }
+
+  .feedback-actions { margin-top: 14px; display: flex; gap: 10px; align-items: flex-start; }
+  .btn-yes, .btn-no {
+    border: none; padding: 9px 20px; border-radius: 6px;
+    cursor: pointer; font-size: 0.9em; font-weight: 500;
+  }
+  .btn-yes { background: #4CAF50; color: #fff; }
+  .btn-yes:hover { background: #43a047; }
+  .btn-no { background: #ef5350; color: #fff; }
+  .btn-no:hover { background: #e53935; }
+  .btn-yes:disabled, .btn-no:disabled { opacity: 0.5; cursor: default; }
+
+  .yes-form, .no-form {
+    margin-top: 12px; padding: 14px; background: #fafafa; border: 1px solid #e8e8e8;
+    border-radius: 8px; display: none;
+  }
+  .yes-form.visible, .no-form.visible { display: block; }
+  .yes-form h4, .no-form h4 { font-size: 0.9em; margin-bottom: 8px; color: #555; }
+  .no-form label { display: inline-block; margin: 3px 12px 3px 0; font-size: 0.88em; cursor: pointer; }
+  .no-form input[type="checkbox"] { margin-right: 4px; }
+  .yes-form textarea, .no-form textarea {
+    width: 100%; margin-top: 8px; padding: 8px; border: 1px solid #ddd;
+    border-radius: 4px; font-family: inherit; font-size: 0.88em; resize: vertical;
+  }
+  .yes-form .btn-submit, .no-form .btn-submit {
+    margin-top: 10px; background: #555; color: #fff; border: none;
+    padding: 7px 18px; border-radius: 5px; cursor: pointer; font-size: 0.88em;
+  }
+  .yes-form .btn-submit:hover, .no-form .btn-submit:hover { background: #333; }
+
+  .lightbox {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.85); align-items: center; justify-content: center; cursor: pointer;
+  }
+  .lightbox.active { display: flex; }
+  .lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>House Finder Review</h1>
+  <div class="header-right">
+    <div>
+      <span class="progress" id="progress-text">0 / {{ listings|length }} reviewed</span>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+    <button class="btn-finish" onclick="finishReview()">Finish Review</button>
+  </div>
+</div>
+
+<div class="stats">
+  Found {{ stats.listings_found }} &middot;
+  Scored {{ stats.listings_scored }} &middot;
+  Passed {{ stats.listings_passed }}
+</div>
+
+<div class="listings">
+  {% for listing in listings %}
+  <div class="card" id="card-{{ listing.id }}" data-id="{{ listing.id }}">
+    <div class="card-body" data-vote-label="">
+      <div class="card-title">{{ listing.price_str }} &mdash; {{ listing.address or "Unknown address" }}</div>
+      <div class="card-meta">
+        {{ listing.beds or "?" }} bed / {{ listing.baths or "?" }} bath
+        &middot; Avg score: <span class="score">{{ "%.1f"|format(listing.avg_score or 0) }}/10</span>
+        {% if listing.listing_pass %}
+          <span class="pass">Passed</span>
+        {% else %}
+          <span class="fail">Did not pass</span>
+        {% endif %}
+      </div>
+
+      {% if listing.photos %}
+      <div class="photos">
+        {% for photo in listing.photos %}
+        <img src="{{ photo }}" alt="Photo {{ loop.index }}" loading="lazy" onclick="openLightbox(this.src)">
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if listing.room_scores %}
+      <div class="room-cards">
+        {% for rs in listing.room_scores %}
+        <div class="room-card">
+          {% if rs.photo_url %}
+          <img src="{{ rs.photo_url }}" alt="{{ rs.room }}" loading="lazy" onclick="openLightbox(this.src)">
+          {% else %}
+          <div class="no-photo">No photo</div>
+          {% endif %}
+          <div class="room-info">
+            <span class="room-name">{{ rs.room | replace("_", " ") }}</span>
+            <span class="score-val">
+              {{ rs.score }}/10
+              {% if rs.get("pass", true) %}
+                <span class="pass-icon">&#10003;</span>
+              {% else %}
+                <span class="fail-icon">&#10007;</span>
+              {% endif %}
+            </span>
+            <div class="room-reasoning">{{ rs.reasoning or "" }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if listing.llm_reasoning %}
+      <div class="reasoning">{{ listing.llm_reasoning }}</div>
+      {% endif %}
+
+      <a class="listing-link" href="{{ listing.url }}" target="_blank">{{ listing.url }}</a>
+
+      <div class="feedback-actions" id="actions-{{ listing.id }}">
+        <button class="btn-yes" onclick="showYesForm({{ listing.id }})">Yes, interested</button>
+        <button class="btn-no" onclick="showNoForm({{ listing.id }})">No, not interested</button>
+      </div>
+
+      <div class="yes-form" id="yes-form-{{ listing.id }}">
+        <h4>What do you like about it? (optional)</h4>
+        <textarea id="yes-reason-{{ listing.id }}" rows="2" placeholder="e.g. Great natural light, nice layout..."></textarea>
+        <button class="btn-submit" onclick="submitYes({{ listing.id }})">Submit</button>
+      </div>
+
+      <div class="no-form" id="no-form-{{ listing.id }}">
+        <h4>Why not? (select all that apply)</h4>
+        {% for cat in categories %}
+        <label><input type="checkbox" name="cat-{{ listing.id }}" value="{{ cat }}"> {{ cat }}</label>
+        {% endfor %}
+        <textarea id="reason-{{ listing.id }}" rows="2" placeholder="Additional comments (optional)"></textarea>
+        <button class="btn-submit" onclick="submitNo({{ listing.id }})">Submit</button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <img id="lightbox-img" src="" alt="Full size">
+</div>
+
+<script>
+const total = {{ listings|length }};
+let reviewed = 0;
+
+function updateProgress() {
+  document.getElementById("progress-text").textContent = reviewed + " / " + total + " reviewed";
+  document.getElementById("progress-fill").style.width = (total ? (reviewed / total * 100) : 0) + "%";
+}
+
+function markReviewed(listingId, vote) {
+  const card = document.getElementById("card-" + listingId);
+  card.classList.add("reviewed", "voted-" + vote);
+  const body = card.querySelector(".card-body");
+  body.setAttribute("data-vote-label", vote === "yes" ? "Interested" : "Not interested");
+  const actions = document.getElementById("actions-" + listingId);
+  actions.querySelectorAll("button").forEach(b => b.disabled = true);
+  const noForm = document.getElementById("no-form-" + listingId);
+  noForm.classList.remove("visible");
+  reviewed++;
+  updateProgress();
+}
+
+function showYesForm(listingId) {
+  document.getElementById("yes-form-" + listingId).classList.add("visible");
+  document.getElementById("no-form-" + listingId).classList.remove("visible");
+}
+
+function submitYes(listingId) {
+  const reason = document.getElementById("yes-reason-" + listingId).value;
+  fetch("/api/feedback", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({listing_id: listingId, vote: "yes", categories: [], reason: reason})
+  }).then(() => markReviewed(listingId, "yes"));
+}
+
+function showNoForm(listingId) {
+  document.getElementById("no-form-" + listingId).classList.add("visible");
+  document.getElementById("yes-form-" + listingId).classList.remove("visible");
+}
+
+function submitNo(listingId) {
+  const checks = document.querySelectorAll('input[name="cat-' + listingId + '"]:checked');
+  const categories = Array.from(checks).map(c => c.value);
+  const reason = document.getElementById("reason-" + listingId).value;
+  fetch("/api/feedback", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({listing_id: listingId, vote: "no", categories: categories, reason: reason})
+  }).then(() => markReviewed(listingId, "no"));
+}
+
+function finishReview() {
+  fetch("/api/done", {method: "POST"}).then(() => {
+    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#666;"><div style="text-align:center"><h2>Review complete</h2><p>You can close this tab.</p></div></div>';
+  });
+}
+
+function openLightbox(src) {
+  document.getElementById("lightbox-img").src = src;
+  document.getElementById("lightbox").classList.add("active");
+}
+function closeLightbox() {
+  document.getElementById("lightbox").classList.remove("active");
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeLightbox(); });
+</script>
+</body>
+</html>

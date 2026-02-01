@@ -1,5 +1,8 @@
+import logging
 import os
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 from sqlalchemy import (
     Column,
@@ -9,6 +12,7 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Session, relationship, sessionmaker
 
@@ -39,6 +43,7 @@ class Listing(Base):
     date_found = Column(String)
     scored_at = Column(String)
     emailed_at = Column(String)
+    reviewed_at = Column(String)
 
     feedbacks = relationship("Feedback", back_populates="listing")
 
@@ -96,8 +101,19 @@ def get_session() -> Session:
     return _SessionLocal()
 
 
+def _ensure_column(table: str, column: str, col_type: str):
+    """Add a column to an existing table if it doesn't exist yet."""
+    with get_engine().connect() as conn:
+        result = conn.execute(text(f"PRAGMA table_info({table})"))
+        columns = [row[1] for row in result]
+        if column not in columns:
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+            conn.commit()
+
+
 def init_db():
     Base.metadata.create_all(get_engine())
+    _ensure_column("listings", "reviewed_at", "TEXT")
 
 
 # --- Listing helpers ---
@@ -161,6 +177,7 @@ def _listing_to_dict(listing: Listing) -> dict:
         "date_found": listing.date_found,
         "scored_at": listing.scored_at,
         "emailed_at": listing.emailed_at,
+        "reviewed_at": listing.reviewed_at,
     }
 
 
@@ -190,6 +207,14 @@ def mark_listing_emailed(listing_id: int):
             session.commit()
 
 
+def mark_listing_reviewed(listing_id: int):
+    with get_session() as session:
+        listing = session.query(Listing).filter_by(id=listing_id).first()
+        if listing:
+            listing.reviewed_at = _now()
+            session.commit()
+
+
 def get_unemailed_passed_listings() -> list[dict]:
     with get_session() as session:
         listings = (
@@ -211,6 +236,14 @@ def get_unscored_listings() -> list[dict]:
 def listing_exists(url: str) -> bool:
     with get_session() as session:
         return session.query(Listing).filter_by(url=url).first() is not None
+
+
+def get_listing_dict_by_url(url: str) -> dict | None:
+    with get_session() as session:
+        listing = session.query(Listing).filter_by(url=url).first()
+        if not listing:
+            return None
+        return _listing_to_dict(listing)
 
 
 def listing_exists_by_address(normalized: str) -> bool:
@@ -242,7 +275,14 @@ def insert_feedback(
         )
         session.add(fb)
         session.commit()
+        logger.info(f"Feedback saved: id={fb.id}, listing_id={listing_id}, vote={vote}")
         return fb.id
+
+
+def get_listing_ids_with_feedback() -> set[int]:
+    with get_session() as session:
+        rows = session.query(Feedback.listing_id).distinct().all()
+        return {row[0] for row in rows}
 
 
 def get_feedback_count() -> int:

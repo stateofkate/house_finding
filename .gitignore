@@ -1,6 +1,8 @@
+pyproject.toml
 venv/
 .env
 *.db
+saved_listings.json
 __pycache__/
 *.pyc
 *.egg-info/

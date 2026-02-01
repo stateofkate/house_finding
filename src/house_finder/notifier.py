@@ -36,30 +36,22 @@ def format_listing_html(listing: dict) -> str:
         except json.JSONDecodeError:
             room_scores = []
 
-    # Show first 3 photos
-    photos_raw = listing.get("photos", "[]")
-    if isinstance(photos_raw, str):
-        try:
-            all_photos = json.loads(photos_raw)
-        except json.JSONDecodeError:
-            all_photos = []
-    else:
-        all_photos = photos_raw
-    display_photos = all_photos[:3]
-
-    photos_html = ""
-    for photo_url in display_photos:
-        photos_html += f'<img src="{photo_url}" style="max-width:300px;margin:5px;" />\n'
-
-    # Room scores table
-    scores_html = ""
+    # Room cards: pair each scored room with its photo
+    room_cards_html = ""
     for rs in room_scores:
         icon = "&#9989;" if rs.get("pass") else "&#10060;"
-        scores_html += (
-            f"<tr><td>{rs.get('room', '')}</td>"
-            f"<td>{rs.get('score', '')}/10 {icon}</td>"
-            f"<td>{rs.get('reasoning', '')}</td></tr>\n"
-        )
+        room_name = rs.get("room", "").replace("_", " ").title()
+        photo_html = ""
+        if rs.get("photo_url"):
+            photo_html = f'<img src="{rs["photo_url"]}" style="width:180px;height:140px;object-fit:cover;border-radius:6px;" />'
+        room_cards_html += f"""
+        <div style="display:flex;gap:12px;align-items:center;padding:8px;margin:6px 0;background:#f9f9f9;border:1px solid #eee;border-radius:6px;">
+            {photo_html}
+            <div>
+                <strong>{room_name}</strong> &mdash; {rs.get('score', '')}/10 {icon}<br>
+                <span style="color:#666;font-size:0.9em;">{rs.get('reasoning', '')}</span>
+            </div>
+        </div>"""
 
     feedback_base = _get_feedback_base_url()
     yes_url = f"{feedback_base}/feedback?id={listing_id}&vote=yes"
@@ -69,11 +61,7 @@ def format_listing_html(listing: dict) -> str:
     <div style="border:1px solid #ccc;padding:15px;margin:15px 0;border-radius:8px;">
         <h2 style="margin:0;">{price_str} &mdash; {address}</h2>
         <p style="color:#666;">Avg score: {avg_score:.1f}/10 | {listing.get('beds', '?')} bed / {listing.get('baths', '?')} bath</p>
-        <div>{photos_html}</div>
-        <table style="border-collapse:collapse;margin:10px 0;">
-            <tr><th>Room</th><th>Score</th><th>Reasoning</th></tr>
-            {scores_html}
-        </table>
+        {room_cards_html}
         <p>{listing.get('llm_reasoning', '')}</p>
         <p>
             <a href="{yes_url}" style="background:#4CAF50;color:white;padding:8px 16px;text-decoration:none;border-radius:4px;margin-right:10px;">Yes, interested</a>

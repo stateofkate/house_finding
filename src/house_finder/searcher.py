@@ -8,7 +8,7 @@ from firecrawl import Firecrawl
 from pydantic import BaseModel, Field
 
 from house_finder.address import normalize_address
-from house_finder.db import insert_listing, listing_exists, listing_exists_by_address
+from house_finder.db import get_listing_dict_by_url, insert_listing, listing_exists, listing_exists_by_address
 
 logger = logging.getLogger(__name__)
 
@@ -135,14 +135,25 @@ async def run_search(
                 urls.append(url)
 
     logger.info(f"Found {len(urls)} URLs from search")
+    logger.info(f"URLs: {urls}")
 
-    # Filter out already-known URLs
+    # Separate already-known URLs from new ones
+    existing_urls = [u for u in urls if listing_exists(u)]
     new_urls = [u for u in urls if not listing_exists(u)]
-    logger.info(f"{len(new_urls)} new URLs after dedup")
+    logger.info(f"{len(new_urls)} new URLs, {len(existing_urls)} already in DB")
     cleaned_urls = [u for u in new_urls if not any(site in u for site in EXCLUDED_SITES)]
-    logger.info(f"{len(cleaned_urls)} URLs after excluding excluded sites")
+    logger.info(f"{len(cleaned_urls)} new URLs after excluding excluded sites")
 
-    # Crawl in parallel with semaphore; process and log each result as it completes
+    # Load existing listings from DB (skip re-crawling)
+    existing_listings = []
+    for url in existing_urls:
+        listing_data = get_listing_dict_by_url(url)
+        if listing_data:
+            existing_listings.append(listing_data)
+    if existing_listings:
+        logger.info(f"Loaded {len(existing_listings)} existing listings from DB")
+
+    # Crawl new URLs in parallel with semaphore
     semaphore = asyncio.Semaphore(3)
     tasks = [_crawl_one(fc, url, semaphore) for url in cleaned_urls[:max_urls]]
     crawled = []
@@ -156,20 +167,14 @@ async def run_search(
             logger.warning(f"[{completed}/{len(tasks)}] Crawl failed for one URL")
             continue
 
-        # Address dedup
-        normalized = listing_data.get("address_normalized")
-        # if normalized and listing_exists_by_address(normalized):
-        #     logger.info(f"[{completed}/{len(tasks)}] Skipping duplicate address: {listing_data.get('address')}")
-        #     continue
-
         listing_id = insert_listing(listing_data)
         listing_data["id"] = listing_id
         crawled.append(listing_data)
         addr = listing_data.get("address") or listing_data.get("url", "")[:50]
         logger.info(f"[{completed}/{len(tasks)}] Crawled: {addr}")
 
-    logger.info(f"Crawled {len(crawled)} listings, {crawl_failures} failures")
-    return crawled
+    logger.info(f"Crawled {len(crawled)} new listings, {crawl_failures} failures, {len(existing_listings)} from DB")
+    return existing_listings + crawled
 
 
 async def crawl_single_url(url: str, run_id: int) -> dict | None:
